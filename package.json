@@ -1,0 +1,26 @@
+{
+  "name": "ziax-aviation",
+  "version": "1.0.0",
+  "description": "records ADSB messages and plays with em",
+  "main": "index.js",
+  "scripts": {
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ziaxdk/ziax-aviation.git"
+  },
+  "keywords": [
+    "ADSB"
+  ],
+  "author": "ziaxdk",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ziaxdk/ziax-aviation/issues"
+  },
+  "homepage": "https://github.com/ziaxdk/ziax-aviation",
+  "dependencies": {
+    "bunyan": "^1.2.3",
+    "moment": "^2.8.4",
+    "sbs1": "^0.2.3"
+  }
+}
