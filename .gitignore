@@ -1,5 +1,6 @@
 node_modules/
 src/recorder/logs/
 src/recorder/data/
+src/parser/data/
 src/www/bower_components/
 npm-debug.log

@@ -7,7 +7,7 @@ var fs = require('fs'),
     Log = bunyan.createLogger({name: "ziax-sbs1-parser"}),
     Metrics = require('statman');
 
-var db = new loki('adsb.json');
+var db = new loki('./data/adsb.json');
 var col = db.addCollection('flight', [ 'id' ]);
 
 // col.insert({id: 1});
@@ -148,7 +148,7 @@ var processLine = function(line) {
 var stopwatch = new Metrics.Stopwatch('duration');
     stopwatch.start();
 
-var file = './D_20122014_172941.txt';
+var file = './data/D_20122014_172941.txt';
 var stream = fs.createReadStream(file);
 stream.on('end', function() {
   console.log('saving...');
