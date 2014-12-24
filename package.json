@@ -20,6 +20,7 @@
   "dependencies": {
     "bunyan": "^1.2.3",
     "elasticsearch": "^3.0.2",
+    "express": "^4.10.6",
     "lazy": "^1.0.11",
     "lokijs": "^1.1.0",
     "moment": "^2.8.4",
