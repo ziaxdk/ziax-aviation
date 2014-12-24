@@ -5,6 +5,15 @@ var fs = require('fs'),
     moment = require('moment'),
     bunyan = require('bunyan'),
     Log = bunyan.createLogger({name: "ziax-sbs1-parser"}),
+    LogLL = bunyan.createLogger({
+        name: 'foo',
+        streams: [{
+            type: 'rotating-file',
+            path: './data/ll-log.log',
+            period: '1d',   // daily rotation
+            count: 3        // keep 3 back copies
+        }]
+    }),
     Metrics = require('statman');
 
 var db = new loki('./data/adsb.json');
@@ -41,105 +50,81 @@ var col = db.addCollection('flight', [ 'id' ]);
 var lastSeen;
 
 var insertToEs = function(flight) {
-  console.log(flight);
+  if (flight.path.length === 0) return;
+  var toLeafletPolyline = flight.path.map(function(f) { return [f.lat, f.lon]; });
+  console.log({ id: flight.hex, path: toLeafletPolyline});
+  // LogLL.info(toLeafletPolyline);
   // throw new Error();
 };
 
 var removeUnseen = function(msg) {
-  if (!lastSeen) {
-    lastSeen = msg._msgTime;
-    return;
-  }
+  var minimumTime = msg._msgTime.clone().subtract(120, 'seconds').unix();
 
-  if (lastSeen.clone().add(120, 'seconds').isBefore(msg._msgTime)) {
-    Log.info('Expiring', msg.hex_ident);
-    col.find({ lastSeen: { '$lte': msg._msgTime.clone().subtract(120, 'seconds').unix() } } ).forEach(function(f) {
-      insertToEs(f);
-      col.remove(f);
-    });
-    lastSeen = msg._msgTime;
-    // throw new Error();
-  }
+  var _expiredFlights = col.find({ lastSeen: { '$lte': minimumTime } } );
+  _expiredFlights.forEach(function(expiredFlight) {
+    insertToEs(expiredFlight);
+    col.remove(expiredFlight);
+  });
+
+
 
 };
 
+// DEBUG: hex = 45AC52
 var processLine = function(line) {
-  var msg = sbs1.parseSbs1Message(line.toString()),
-      _id = parseInt(msg.hex_ident, 16),
-      flight = col.find({ id: _id })[0];
+  var msg = sbs1.parseSbs1Message(line.toString());
   
+  
+  var dbFlights = col.find({ hex: msg.hex_ident }),
+      dbFlight = dbFlights[0];
+
+  // if (msg.hex_ident !== '45AC52') return;
+
   msg._msgTime = moment(msg.logged_date + ' ' + msg.logged_time, 'YYYY/MM/DD HH:mm:ss.SSS');
   Log.debug('Parsing', msg.hex_ident, 'type', msg.transmission_type);
 
+  
+  if (dbFlight) {
+    dbFlight.lastSeen = msg._msgTime.unix();
+  }
+  else {
+    dbFlight = {
+      hex: msg.hex_ident,
+      path: [],
+      lastSeen: msg._msgTime.unix()
+    };
+  }
+
+
   switch(msg.transmission_type) {
     case 1:
-      if (!flight || !flight.callsign) {
-
-        col.insert({
-          id: _id,
-          hex: msg.hex_ident,
-          callsign: msg.callsign,
-          path: [],
-          lastSeen: msg._msgTime.format()
-        });
-      }
-      else {
-        flight.callsign = msg.callsign;
-        flight.lastSeen = msg._msgTime.unix();
-        col.update(flight);
+      if (!dbFlight.callsign) {
+        dbFlight.callsign = msg.callsign;
       }
     break;
 
     case 3:
-      if (!flight) {
-
-        col.insert({
-          id: _id,
-          hex: msg.hex_ident,
-          path: [{
-            alt: msg.altitude,
-            lat: msg.lat,
-            lon: msg.lon,
-            time: msg._msgTime.format()
-          }],
-          lastSeen: msg._msgTime.unix()
-        });
-
-      }
-      else {
-
-        flight.path.push({
-          alt: msg.altitude,
-          lat: msg.lat,
-          lon: msg.lon,
-          time: msg._msgTime
-        });
-        flight.lastSeen = msg._msgTime.unix();
-        col.update(flight);
-
-      }
+      dbFlight.path.push({
+        alt: msg.altitude,
+        lat: msg.lat,
+        lon: msg.lon,
+        time: msg._msgTime.format()
+      });
     break;
 
     case 6:
-      if (!flight || !flight.squawk) {
-
-        col.insert({
-          id: _id,
-          hex: msg.hex_ident,
-          squawk: msg.squawk,
-          path: [],
-          lastSeen: msg._msgTime.unix()
-        });
-
-      }
-      else {
-        flight.squawk = msg.squawk;
-        flight.lastSeen = msg._msgTime.unix();
-        col.update(flight);
-
+      if (!dbFlight.squawk) {
+        dbFlight.squawk = msg.squawk;
       }
     break;
 
+  }
+
+  if (dbFlight.meta) {
+    col.update(dbFlight);
+  }
+  else {
+    col.insert(dbFlight);
   }
   
   removeUnseen(msg);
