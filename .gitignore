@@ -3,4 +3,6 @@ src/recorder/logs/
 src/recorder/data/
 src/parser/data/
 src/www/bower_components/
+dumps/
+es/
 npm-debug.log

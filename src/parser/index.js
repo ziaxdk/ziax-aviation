@@ -14,9 +14,20 @@ var fs = require('fs'),
             count: 3        // keep 3 back copies
         }]
     }),
-    Metrics = require('statman');
+    Metrics = require('statman'),
+    elasticsearch = require('elasticsearch'),
+    client = new elasticsearch.Client({
+      host: 'localhost:9200',
+      log: 'error'
+    });
+
 
 var db = new loki('./data/adsb.json');
+// db.loadDatabase({}, function() {
+//   var _col = db.getCollection('flight');
+//   console.log(db);
+// });
+// return;
 var col = db.addCollection('flight', [ 'id' ]);
 
 // col.insert({id: 1});
@@ -41,7 +52,6 @@ var col = db.addCollection('flight', [ 'id' ]);
 // // 
 
 
-
 // MSG,1,111,11111,47831E,111111,2014/12/20,17:29:48.806,2014/12/20,17:29:48.778,SAS7675 ,,,,,,,,,,,0               // Callsign
 // MSG,3,111,11111,47831E,111111,2014/12/20,17:29:41.591,2014/12/20,17:29:41.582,,37975,,,55.97050,11.30991,,,,,,0  // Altitude, lat, lon
 // MSG,6,111,11111,47831E,111111,2014/12/20,17:29:44.881,2014/12/20,17:29:44.851,,,,,,,,760,0,0,0,0                 // Squawk
@@ -51,8 +61,25 @@ var lastSeen;
 
 var insertToEs = function(flight) {
   if (flight.path.length === 0) return;
-  var toLeafletPolyline = flight.path.map(function(f) { return [f.lat, f.lon]; });
-  console.log({ id: flight.hex, path: toLeafletPolyline});
+  // var toLeafletPolyline = flight.path.map(function(f) { return [f.lat, f.lon]; });
+  // console.log({ id: flight.hex, path: toLeafletPolyline});
+  client.index({
+    index: 'aviation',
+    type: 'flight',
+    body: {
+      hex: flight.hex,
+      latLon: {
+        "type": "linestring",
+        "coordinates": flight.path.map(function(f) { return [f.lat, f.lon]; })
+      },
+      path: flight.path,
+      callsign: flight.callsign,
+      squawk: flight.squawk,
+      firstSeen: flight.firstEntry,
+      lastSeen: flight.lastEntry
+    }
+  });
+  console.log('Inserting', flight.hex);
   // LogLL.info(toLeafletPolyline);
   // throw new Error();
 };
@@ -85,12 +112,15 @@ var processLine = function(line) {
 
   
   if (dbFlight) {
+    dbFlight.lastEntry = msg._msgTime;
     dbFlight.lastSeen = msg._msgTime.unix();
   }
   else {
     dbFlight = {
       hex: msg.hex_ident,
       path: [],
+      firstEntry:  msg._msgTime,
+      lastEntry: msg._msgTime,
       lastSeen: msg._msgTime.unix()
     };
   }
@@ -108,7 +138,7 @@ var processLine = function(line) {
         alt: msg.altitude,
         lat: msg.lat,
         lon: msg.lon,
-        time: msg._msgTime.format()
+        time: msg._msgTime
       });
     break;
 
@@ -137,8 +167,12 @@ var file = './data/D_20122014_172941.txt';
 var stream = fs.createReadStream(file);
 stream.on('end', function() {
   console.log('saving...');
-  db.save();
-  Log.info("duration", stopwatch.read());
+  setTimeout(function() {
+    db.save();
+    client.close();
+    Log.info("duration", stopwatch.read());
+  }, 3000);
+
 });
 
 new lazy(stream)
