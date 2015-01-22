@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ziax-Aviation</title>
+
+  <style type="text/css">
+    ul, li { margin: 0; padding: 0; }
+    .flights ul.path { /*overflow: hidden;*/ white-space: nowrap; }
+    .flights ul.path li  { list-style: none; display: inline-block; }
+
+    /**
+     * For modern browsers
+     * 1. The space content is one way to avoid an Opera bug when the
+     *    contenteditable attribute is included anywhere else in the document.
+     *    Otherwise it causes space to appear at the top and bottom of elements
+     *    that are clearfixed.
+     * 2. The use of `table` rather than `block` is only necessary if using
+     *    `:before` to contain the top-margins of child elements.
+     */
+    .cf:before,
+    .cf:after {
+        content: " "; /* 1 */
+        display: table; /* 2 */
+    }
+
+    .cf:after {
+        clear: both;
+    }
+
+    /**
+     * For IE 6/7 only
+     * Include this rule to trigger hasLayout and contain floats.
+     */
+    .cf {
+        *zoom: 1;
+    }
+
+
+  </style>
+
+  <script type="text/javascript" src="bower_components/angular/angular.js"></script>
+  <script type="text/javascript" src="bower_components/elasticsearch/elasticsearch.angular.js"></script>
+</head>
+<body ng-app="app" ng-controller="ctrl as c">
+
+  <div ng-repeat="f in c.flights" class="flights">
+    <p>{{f.hex}}</p>
+    <ul class="path cf">
+      <li ng-repeat="p in f.path" ng-style="{ width: c.calcWidth($index, f) }">
+        <div style="border: 1px solid red; height: 20px" title="{{p.time}}"></div>
+      </li>
+    </ul>
+  </div>
+
+  <script type="text/javascript">
+    (function() {
+      
+      angular.module('app', ['elasticsearch'])
+      .service('client', function (esFactory) {
+        return esFactory({
+          host: 'localhost:9200'
+        });
+      })
+      .controller('ctrl', ['client', function(client) {
+        var _t = this;
+
+        _t.calcWidth = function(index, flight) {
+          var f1 = flight.path[index],
+              f2 = flight.path[index+1];
+
+          if (!f1 || !f2) return;
+          var d1 = new Date(f1.time),
+              d2 = new Date(f2.time);
+          var size = Math.ceil( (d2-d1) / 100 );
+
+          return size + 'px';
+          // return '10px';
+        };
+
+
+        client.search({
+          index: 'aviation',
+          type: 'flight',
+          body: {
+            "query": {
+              "filtered": {
+                "query": {"match_all": {} },
+                "filter": {
+                  "bool": {
+                    "must": [
+                      {
+                        "range": {
+                          "path.time": {
+                            "from": "2014-12-20T17:00:00.000Z",
+                            "to": "2014-12-20T17:02:00.000Z"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            
+            },
+            "_source": {
+              "exclude": "latLon"
+            }
+          }
+        }, function (error, response) {
+          _t.flights = response.hits.hits.map(function(v) { return v._source; });
+          // _t.flights = [_t.flights[0]];
+          console.log(_t.flights);
+        });
+
+
+
+      }]);
+
+
+
+    }());
+  </script>
+</body>
+</html>

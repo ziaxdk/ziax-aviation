@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" ng-app="ziaxdash">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,8 +36,44 @@
       var map = L.map('map').setView([51.505, -0.09], 13);
 
       L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+          attribution: '&copy;'
       }).addTo(map);
+
+      var compute = function(a, b, now) {
+          var xd = b.lat - a.lat,
+              yd = b.lon - a.lon,
+              td = b.time - a.time,
+              fs = now - a.time;
+          if ( td < fs ) throw new Error("Time delta is less than from start delta");
+          var div =  td / fs,
+              xnew = xd / div + a.lat,
+              ynew = yd / div + a.lon;
+
+          console.log(xd, yd, td, fs, div, xnew, ynew); 
+          return { lat: xnew, lon: ynew, time: now };
+      };
+
+
+      var now = new Date(2014, 11, 12, 08, 00, 01);
+
+      var path = [
+          { lat: 54, lon: 11, time: new Date(2014, 11, 12, 08, 00, 00) },
+          { lat: 55, lon: 12, time: new Date(2014, 11, 12, 08, 00, 02) }
+     ];
+
+
+     // var n = compute(path[0], path[1], now);
+     
+     // var latlngs = [[ path[0].lat, path[0].lon ], [n.lat, n.lon] ];
+     // // var latlngs = [[ path[0].lat, path[0].lon ], [ path[1].lat, path[1].lon ] ];
+
+     //  // create a red polyline from an array of LatLng points
+    // var polyline2 = L.polyline(, { color: 'red' }).addTo(map);
+    var polyline = L.polyline(path.map(function(v) { return [ v.lat, v.lon ]; }), { color: 'blue' }).addTo(map);
+    map.fitBounds(polyline.getBounds());
+
+
+      return;
 
       var latlngs =[ [ 56.1332, 14.84553 ],
      [ 56.13194, 14.84195 ],

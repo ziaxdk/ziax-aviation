@@ -5,15 +5,15 @@ var fs = require('fs'),
     moment = require('moment'),
     bunyan = require('bunyan'),
     Log = bunyan.createLogger({name: "ziax-sbs1-parser"}),
-    LogLL = bunyan.createLogger({
-        name: 'foo',
-        streams: [{
-            type: 'rotating-file',
-            path: './data/ll-log.log',
-            period: '1d',   // daily rotation
-            count: 3        // keep 3 back copies
-        }]
-    }),
+    // LogLL = bunyan.createLogger({
+    //     name: 'foo',
+    //     streams: [{
+    //         type: 'rotating-file',
+    //         path: './data/ll-log.log',
+    //         period: '1d',   // daily rotation
+    //         count: 3        // keep 3 back copies
+    //     }]
+    // }),
     Metrics = require('statman'),
     elasticsearch = require('elasticsearch'),
     client = new elasticsearch.Client({
